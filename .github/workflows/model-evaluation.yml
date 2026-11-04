@@ -57,7 +57,7 @@ jobs:
       - name: Stop API
         if: always()
         run: kill "$API_PID" 2>/dev/null || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ${{ inputs.provider }}-evaluation-report
@@ -65,7 +65,7 @@ jobs:
           if-no-files-found: error
       - name: Upload API diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.provider }}-api-log
           path: /tmp/agent-kit-model-evaluation.log
