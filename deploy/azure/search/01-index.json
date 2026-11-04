@@ -1,0 +1,201 @@
+{
+  "name": "idx-eaokit-chunks-v1",
+  "fields": [
+    {
+      "name": "chunkId",
+      "type": "Edm.String",
+      "key": true,
+      "searchable": true,
+      "filterable": true,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true,
+      "analyzer": "keyword"
+    },
+    {
+      "name": "documentId",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "tenantId",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": true,
+      "retrievable": true
+    },
+    {
+      "name": "accessTags",
+      "type": "Collection(Edm.String)",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": true,
+      "retrievable": true
+    },
+    {
+      "name": "title",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "content",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "sourceUri",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "fileName",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "sortable": true,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "locator",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": false,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "chunkOrdinal",
+      "type": "Edm.Int32",
+      "searchable": false,
+      "filterable": true,
+      "sortable": true,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "contentHash",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "createdAt",
+      "type": "Edm.DateTimeOffset",
+      "searchable": false,
+      "filterable": true,
+      "sortable": true,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "modifiedAt",
+      "type": "Edm.DateTimeOffset",
+      "searchable": false,
+      "filterable": true,
+      "sortable": true,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "ingestionVersion",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": true
+    },
+    {
+      "name": "contentVector",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "filterable": false,
+      "sortable": false,
+      "facetable": false,
+      "retrievable": false,
+      "stored": false,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vp-eaokit-v1"
+    }
+  ],
+  "vectorSearch": {
+    "algorithms": [
+      {
+        "name": "hnsw-eaokit-v1",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "metric": "cosine",
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500
+        }
+      }
+    ],
+    "profiles": [
+      {
+        "name": "vp-eaokit-v1",
+        "algorithm": "hnsw-eaokit-v1",
+        "vectorizer": "vz-eaokit-azure-openai-v1"
+      }
+    ],
+    "vectorizers": [
+      {
+        "name": "vz-eaokit-azure-openai-v1",
+        "kind": "azureOpenAI",
+        "azureOpenAIParameters": {
+          "resourceUri": "https://REPLACE_WITH_AZURE_OPENAI_RESOURCE.openai.azure.com",
+          "deploymentId": "REPLACE_WITH_EMBEDDING_DEPLOYMENT",
+          "modelName": "text-embedding-3-small",
+          "apiKey": "REPLACE_WITH_AZURE_OPENAI_API_KEY"
+        }
+      }
+    ]
+  },
+  "semantic": {
+    "defaultConfiguration": "sem-eaokit-grounding-v1",
+    "configurations": [
+      {
+        "name": "sem-eaokit-grounding-v1",
+        "prioritizedFields": {
+          "titleField": {
+            "fieldName": "title"
+          },
+          "prioritizedContentFields": [
+            {
+              "fieldName": "content"
+            }
+          ],
+          "prioritizedKeywordsFields": [
+            {
+              "fieldName": "fileName"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

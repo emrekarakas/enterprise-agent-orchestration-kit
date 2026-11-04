@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dotnet-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /src/Orchestrator.Api
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /src/document-worker
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /src/document-worker
+    schedule:
+      interval: weekly

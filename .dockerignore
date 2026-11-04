@@ -1,0 +1,15 @@
+**/bin
+**/obj
+.git
+.env
+.env.*
+!.env.example
+.idea
+.vscode
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/*.user
+evaluations/results
+data
+TestResults
+artifacts

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Orchestrator.AgentFramework/Orchestrator.AgentFramework.csproj" />
+    <ProjectReference Include="../../src/Orchestrator.Application/Orchestrator.Application.csproj" />
+    <ProjectReference Include="../../src/Orchestrator.Domain/Orchestrator.Domain.csproj" />
+    <ProjectReference Include="../../src/Orchestrator.Providers/Orchestrator.Providers.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

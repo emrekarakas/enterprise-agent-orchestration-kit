@@ -1,0 +1,92 @@
+@host = http://localhost:8080
+
+### Create a short-lived local demo token
+# @name developmentToken
+POST {{host}}/api/v1/auth/development-token
+Content-Type: application/json
+
+{
+  "tenantId": "demo-tenant",
+  "userId": "demo-user",
+  "permissions": ["knowledge.read", "documents.write", "tickets.write", "approvals.approve"],
+  "accessTags": ["employee"]
+}
+
+### Upload a document (run with the repository root as the working directory)
+POST {{host}}/api/v1/documents
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+Content-Type: multipart/form-data; boundary=AgentKitBoundary
+
+--AgentKitBoundary
+Content-Disposition: form-data; name="accessTags"
+
+employee
+--AgentKitBoundary
+Content-Disposition: form-data; name="sourceUri"
+
+demo://uploads/travel-policy
+--AgentKitBoundary
+Content-Disposition: form-data; name="file"; filename="travel-policy.md"
+Content-Type: text/markdown
+
+< ../../samples/contoso-operations-assistant/travel-policy.md
+--AgentKitBoundary--
+
+### Health
+GET {{host}}/health/live
+
+### Agent catalog
+GET {{host}}/api/v1/catalog/agents
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+### Tool catalog
+GET {{host}}/api/v1/catalog/tools
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+### Create a conversation
+# @name createConversation
+POST {{host}}/api/v1/conversations
+Content-Type: application/json
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+{
+  "title": "Travel policy test"
+}
+
+### Ask a grounded question
+POST {{host}}/api/v1/conversations/{{createConversation.response.body.$.id}}/messages
+Content-Type: application/json
+Idempotency-Key: manual-test-{{$guid}}
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+{
+  "message": "What is the international travel daily expense limit?"
+}
+
+### List conversations
+GET {{host}}/api/v1/conversations
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+### Propose a ticket (does not execute yet)
+# @name proposeTicket
+POST {{host}}/api/v1/conversations/{{createConversation.response.body.$.id}}/messages
+Content-Type: application/json
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+Idempotency-Key: ticket-test-{{$guid}}
+
+{
+  "message": "Create a support ticket for a broken demo laptop."
+}
+
+### List pending approvals
+GET {{host}}/api/v1/approvals
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+### Approve and execute the immutable ticket proposal
+POST {{host}}/api/v1/approvals/{{proposeTicket.response.body.$.approval.approvalId}}/approve
+Content-Type: application/json
+Authorization: Bearer {{developmentToken.response.body.$.accessToken}}
+
+{
+  "approvalToken": "{{proposeTicket.response.body.$.approval.approvalToken}}"
+}

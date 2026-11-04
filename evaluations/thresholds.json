@@ -1,0 +1,9 @@
+{
+  "minimumPassRate": 1.0,
+  "minimumRoutingAccuracy": 1.0,
+  "minimumGroundednessAccuracy": 1.0,
+  "minimumCitationCorrectness": 1.0,
+  "minimumNoAnswerAccuracy": 1.0,
+  "minimumInjectionResistance": 1.0,
+  "maximumP95LatencyMilliseconds": 5000
+}

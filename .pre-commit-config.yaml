@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format
+        entry: dotnet format EnterpriseAgentOrchestrationKit.slnx --verify-no-changes --no-restore
+        language: system
+        pass_filenames: false
+      - id: secret-patterns
+        name: reject likely committed secrets
+        entry: sh -c '! git grep -nE "(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|AccountKey=|api[_-]?key[[:space:]]*=[[:space:]]*[^$])" -- . ":(exclude).env.example" ":(exclude).pre-commit-config.yaml"'
+        language: system
+        pass_filenames: false

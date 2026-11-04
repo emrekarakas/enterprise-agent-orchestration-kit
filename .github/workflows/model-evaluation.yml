@@ -1,0 +1,72 @@
+name: manual-model-evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Provider adapter to evaluate
+        required: true
+        type: choice
+        options:
+          - AzureOpenAI
+          - OpenAiCompatible
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: model-evaluation
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      AI__Provider: ${{ inputs.provider }}
+      AzureOpenAI__Endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AzureOpenAI__ApiKey: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      AzureOpenAI__CredentialMode: ApiKey
+      AzureOpenAI__ChatDeployment: ${{ secrets.AZURE_OPENAI_CHAT_DEPLOYMENT }}
+      AzureOpenAI__StructuredOutputDeployment: ${{ secrets.AZURE_OPENAI_STRUCTURED_OUTPUT_DEPLOYMENT }}
+      AzureOpenAI__EmbeddingDeployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+      OpenAiCompatible__Endpoint: ${{ secrets.OPENAI_COMPATIBLE_ENDPOINT }}
+      OpenAiCompatible__ApiKey: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
+      OpenAiCompatible__ChatModel: ${{ secrets.OPENAI_COMPATIBLE_CHAT_MODEL }}
+      OpenAiCompatible__StructuredOutputModel: ${{ secrets.OPENAI_COMPATIBLE_STRUCTURED_MODEL }}
+      OpenAiCompatible__EmbeddingModel: ${{ secrets.OPENAI_COMPATIBLE_EMBEDDING_MODEL }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore and build API
+        run: |
+          dotnet restore EnterpriseAgentOrchestrationKit.slnx
+          dotnet build src/Orchestrator.Api/Orchestrator.Api.csproj --configuration Release --no-restore
+      - name: Start isolated evaluation API
+        run: |
+          dotnet run --project src/Orchestrator.Api/Orchestrator.Api.csproj --configuration Release --no-build --no-launch-profile --urls http://127.0.0.1:8080 > /tmp/agent-kit-model-evaluation.log 2>&1 &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/health/live > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/agent-kit-model-evaluation.log
+          exit 1
+      - name: Run real-provider quality evaluation
+        run: python3 evaluations/run.py --provider-label "${{ inputs.provider }}"
+      - name: Stop API
+        if: always()
+        run: kill "$API_PID" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.provider }}-evaluation-report
+          path: evaluations/results/smoke-report.json
+          if-no-files-found: error
+      - name: Upload API diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.provider }}-api-log
+          path: /tmp/agent-kit-model-evaluation.log
+          if-no-files-found: warn

@@ -1,0 +1,12 @@
+{
+  "name": "ds-eaokit-documents-blob-v1",
+  "description": "Synthetic enterprise documents stored in an isolated Azure Blob container.",
+  "type": "azureblob",
+  "credentials": {
+    "connectionString": "REPLACE_WITH_AZURE_STORAGE_CONNECTION_STRING"
+  },
+  "container": {
+    "name": "eaokit-documents-dev",
+    "query": null
+  }
+}

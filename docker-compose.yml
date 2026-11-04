@@ -1,0 +1,150 @@
+name: enterprise-agent-kit
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Orchestrator.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Authentication__Mode: ${AUTHENTICATION_MODE:-DevelopmentTokens}
+      Authentication__Audience: ${AUTHENTICATION_AUDIENCE:-enterprise-agent-api}
+      AI__Provider: ${AI_PROVIDER:-DeterministicFake}
+      OpenAiCompatible__Endpoint: ${OPENAI_COMPATIBLE_ENDPOINT:-http://host.docker.internal:11434/v1}
+      OpenAiCompatible__ChatModel: ${OPENAI_COMPATIBLE_CHAT_MODEL:-}
+      OpenAiCompatible__StructuredOutputModel: ${OPENAI_COMPATIBLE_STRUCTURED_MODEL:-}
+      OpenAiCompatible__EmbeddingModel: ${OPENAI_COMPATIBLE_EMBEDDING_MODEL:-}
+      OpenAiCompatible__ApiKey: ${OPENAI_COMPATIBLE_API_KEY:-}
+      AzureOpenAI__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
+      AzureOpenAI__ChatDeployment: ${AZURE_OPENAI_CHAT_DEPLOYMENT:-}
+      AzureOpenAI__StructuredOutputDeployment: ${AZURE_OPENAI_STRUCTURED_OUTPUT_DEPLOYMENT:-}
+      AzureOpenAI__EmbeddingDeployment: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-}
+      AzureOpenAI__CredentialMode: ${AZURE_OPENAI_CREDENTIAL_MODE:-DefaultAzureCredential}
+      AzureOpenAI__ManagedIdentityClientId: ${AZURE_OPENAI_MANAGED_IDENTITY_CLIENT_ID:-}
+      AzureOpenAI__ApiKey: ${AZURE_OPENAI_API_KEY:-}
+      Search__Provider: ${SEARCH_PROVIDER:-}
+      AzureAiSearch__Endpoint: ${AZURE_AI_SEARCH_ENDPOINT:-}
+      AzureAiSearch__IndexName: ${AZURE_AI_SEARCH_INDEX:-idx-eaokit-chunks-v1}
+      AzureAiSearch__SemanticConfiguration: ${AZURE_AI_SEARCH_SEMANTIC_CONFIG:-sem-eaokit-grounding-v1}
+      AzureAiSearch__CredentialMode: ${AZURE_AI_SEARCH_CREDENTIAL_MODE:-DefaultAzureCredential}
+      AzureAiSearch__ManagedIdentityClientId: ${AZURE_AI_SEARCH_MANAGED_IDENTITY_CLIENT_ID:-}
+      AzureAiSearch__ApiKey: ${AZURE_AI_SEARCH_API_KEY:-}
+      Messaging__Provider: ${MESSAGING_PROVIDER:-InMemory}
+      AzureServiceBus__FullyQualifiedNamespace: ${AZURE_SERVICE_BUS_NAMESPACE:-}
+      AzureServiceBus__TopicName: ${AZURE_SERVICE_BUS_TOPIC:-agent-events}
+      AzureServiceBus__CredentialMode: ${AZURE_SERVICE_BUS_CREDENTIAL_MODE:-DefaultAzureCredential}
+      AzureServiceBus__ManagedIdentityClientId: ${AZURE_SERVICE_BUS_MANAGED_IDENTITY_CLIENT_ID:-}
+      AzureServiceBus__ConnectionString: ${AZURE_SERVICE_BUS_CONNECTION_STRING:-}
+      AzureBlobStorage__Enabled: ${AZURE_BLOB_STORAGE_ENABLED:-false}
+      AzureBlobStorage__ServiceUri: ${AZURE_BLOB_STORAGE_SERVICE_URI:-}
+      AzureBlobStorage__ContainerName: ${AZURE_BLOB_STORAGE_CONTAINER:-eaokit-documents-dev}
+      AzureBlobStorage__CredentialMode: ${AZURE_BLOB_STORAGE_CREDENTIAL_MODE:-DefaultAzureCredential}
+      AzureBlobStorage__ManagedIdentityClientId: ${AZURE_BLOB_STORAGE_MANAGED_IDENTITY_CLIENT_ID:-}
+      AzureBlobStorage__ConnectionString: ${AZURE_BLOB_STORAGE_CONNECTION_STRING:-}
+      Persistence__Provider: Postgres
+      Cache__Provider: ${CACHE_PROVIDER:-Redis}
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB:-agentkit};Username=${POSTGRES_USER:-agentkit};Password=${POSTGRES_PASSWORD:-local-development-only}
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379,abortConnect=false}
+      Redis__KeyPrefix: eaokit
+      DocumentWorker__Enabled: "true"
+      DocumentWorker__BaseUrl: http://document-worker:8090
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-lgtm:4317}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      document-worker:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  document-worker:
+    build:
+      context: ./src/document-worker
+      dockerfile: Dockerfile
+    environment:
+      DOCUMENT_WORKER_VECTOR_STORE: qdrant
+      DOCUMENT_WORKER_QDRANT_URL: http://qdrant:6333
+      DOCUMENT_WORKER_DATA_DIR: /data
+      DOCUMENT_WORKER_STORE_ORIGINALS: "${STORE_ORIGINAL_DOCUMENTS:-false}"
+      DOCUMENT_WORKER_MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-26214400}"
+    ports:
+      - "${DOCUMENT_WORKER_PORT:-8090}:8090"
+    volumes:
+      - document-worker-data:/data
+    depends_on:
+      qdrant:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentkit}
+      POSTGRES_USER: ${POSTGRES_USER:-agentkit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentkit} -d ${POSTGRES_DB:-agentkit}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    security_opt:
+      - no-new-privileges:true
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.11.10
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+    volumes:
+      - observability-data:/data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  document-worker-data:
+  observability-data:

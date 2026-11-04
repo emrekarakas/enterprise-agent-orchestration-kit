@@ -1,0 +1,25 @@
+{
+  "name": "ixr-eaokit-documents-v1",
+  "description": "Incrementally extracts, chunks, embeds, and indexes the synthetic document corpus.",
+  "dataSourceName": "ds-eaokit-documents-blob-v1",
+  "targetIndexName": "idx-eaokit-chunks-v1",
+  "skillsetName": "ss-eaokit-document-enrichment-v1",
+  "schedule": {
+    "interval": "PT1H"
+  },
+  "parameters": {
+    "batchSize": 1,
+    "maxFailedItems": 10,
+    "maxFailedItemsPerBatch": 1,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "default",
+      "indexedFileNameExtensions": ".pdf,.docx,.pptx,.xlsx,.md,.txt",
+      "failOnUnsupportedContentType": false,
+      "failOnUnprocessableDocument": false,
+      "indexStorageMetadataOnlyForOversizedDocuments": false
+    }
+  },
+  "fieldMappings": [],
+  "outputFieldMappings": []
+}

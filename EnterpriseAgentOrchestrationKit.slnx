@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Orchestrator.AgentFramework/Orchestrator.AgentFramework.csproj" />
+    <Project Path="src/Orchestrator.Api/Orchestrator.Api.csproj" />
+    <Project Path="src/Orchestrator.Application/Orchestrator.Application.csproj" />
+    <Project Path="src/Orchestrator.Contracts/Orchestrator.Contracts.csproj" />
+    <Project Path="src/Orchestrator.Domain/Orchestrator.Domain.csproj" />
+    <Project Path="src/Orchestrator.Infrastructure/Orchestrator.Infrastructure.csproj" />
+    <Project Path="src/Orchestrator.Observability/Orchestrator.Observability.csproj" />
+    <Project Path="src/Orchestrator.Providers/Orchestrator.Providers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Orchestrator.ArchitectureTests/Orchestrator.ArchitectureTests.csproj" />
+    <Project Path="tests/Orchestrator.EndToEndTests/Orchestrator.EndToEndTests.csproj" />
+    <Project Path="tests/Orchestrator.IntegrationTests/Orchestrator.IntegrationTests.csproj" />
+    <Project Path="tests/Orchestrator.UnitTests/Orchestrator.UnitTests.csproj" />
+  </Folder>
+</Solution>

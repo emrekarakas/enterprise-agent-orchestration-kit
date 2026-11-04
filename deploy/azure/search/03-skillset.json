@@ -1,0 +1,136 @@
+{
+  "name": "ss-eaokit-document-enrichment-v1",
+  "description": "Chunks documents, generates Azure OpenAI embeddings, and projects tenant-scoped chunks.",
+  "skills": [
+    {
+      "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
+      "name": "split-content-into-chunks",
+      "description": "Split extracted document text into overlapping chunks.",
+      "context": "/document",
+      "defaultLanguageCode": "en",
+      "textSplitMode": "pages",
+      "maximumPageLength": 2000,
+      "pageOverlapLength": 500,
+      "maximumPagesToTake": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/content"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "textItems",
+          "targetName": "pages"
+        },
+        {
+          "name": "ordinalPositions",
+          "targetName": "ordinalPositions"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
+      "name": "embed-each-chunk",
+      "description": "Generate a 1536-dimensional vector for every chunk.",
+      "context": "/document/pages/*",
+      "resourceUri": "https://REPLACE_WITH_AZURE_OPENAI_RESOURCE.openai.azure.com",
+      "deploymentId": "REPLACE_WITH_EMBEDDING_DEPLOYMENT",
+      "modelName": "text-embedding-3-small",
+      "dimensions": 1536,
+      "apiKey": "REPLACE_WITH_AZURE_OPENAI_API_KEY",
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/pages/*"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "embedding",
+          "targetName": "contentVector"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Util.ShaperSkill",
+      "name": "shape-security-metadata",
+      "description": "Normalize the required single demo access tag into a collection for fail-closed filtering.",
+      "context": "/document",
+      "inputs": [
+        {
+          "name": "accessTags",
+          "source": "=[$(/document/Accesstag)]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "targetName": "securityMetadata"
+        }
+      ]
+    }
+  ],
+  "indexProjections": {
+    "selectors": [
+      {
+        "targetIndexName": "idx-eaokit-chunks-v1",
+        "parentKeyFieldName": "documentId",
+        "sourceContext": "/document/pages/*",
+        "mappings": [
+          {
+            "name": "tenantId",
+            "source": "/document/Tenantid"
+          },
+          {
+            "name": "accessTags",
+            "source": "/document/securityMetadata/accessTags"
+          },
+          {
+            "name": "title",
+            "source": "/document/metadata_storage_name"
+          },
+          {
+            "name": "content",
+            "source": "/document/pages/*"
+          },
+          {
+            "name": "sourceUri",
+            "source": "/document/metadata_storage_path"
+          },
+          {
+            "name": "fileName",
+            "source": "/document/metadata_storage_name"
+          },
+          {
+            "name": "locator",
+            "source": "/document/metadata_storage_path"
+          },
+          {
+            "name": "contentHash",
+            "source": "/document/Contenthash"
+          },
+          {
+            "name": "createdAt",
+            "source": "/document/metadata_storage_last_modified"
+          },
+          {
+            "name": "modifiedAt",
+            "source": "/document/metadata_storage_last_modified"
+          },
+          {
+            "name": "ingestionVersion",
+            "source": "/document/Ingestionversion"
+          },
+          {
+            "name": "contentVector",
+            "source": "/document/pages/*/contentVector"
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "projectionMode": "skipIndexingParentDocuments"
+    }
+  }
+}
