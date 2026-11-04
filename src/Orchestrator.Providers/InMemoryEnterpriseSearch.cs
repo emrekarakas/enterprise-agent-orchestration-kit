@@ -6,7 +6,7 @@ namespace Orchestrator.Providers;
 
 public sealed class InMemoryEnterpriseSearch : ISearchIndex
 {
-    private static readonly Regex Tokens = new(@"[\p{L}\p{N}]+", RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(50));
+    private static readonly Regex Tokens = new(@"[\p{L}\p{N}]+", RegexOptions.NonBacktracking);
     private readonly IReadOnlyList<SearchHit> _documents;
 
     public InMemoryEnterpriseSearch() => _documents = Seed().ToArray();
