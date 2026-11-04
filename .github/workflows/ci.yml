@@ -99,13 +99,13 @@ jobs:
           push: false
           tags: enterprise-agent-document-worker:ci
           load: true
-      - uses: aquasecurity/trivy-action@0.33.1
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: enterprise-agent-kit:ci
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: '1'
-      - uses: aquasecurity/trivy-action@0.33.1
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: enterprise-agent-document-worker:ci
           severity: CRITICAL,HIGH
