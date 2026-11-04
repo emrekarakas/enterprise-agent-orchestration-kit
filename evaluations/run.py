@@ -160,10 +160,22 @@ def evaluate_case(
             if expected is not None and response.get(field) != expected:
                 failures.append(f"expected {field}={expected!r}, received {response.get(field)!r}")
 
-        citation_titles = {item.get("title") for item in response.get("citations", [])}
-        for title in case.get("expectedCitationTitles", []):
-            if title not in citation_titles:
-                failures.append(f"missing citation title {title!r}")
+        citations = response.get("citations", [])
+        citation_titles = {item.get("title") for item in citations}
+        expected_citation_titles = set(case.get("expectedCitationTitles", []))
+        missing_titles = sorted(expected_citation_titles - citation_titles)
+        unexpected_titles = sorted(citation_titles - expected_citation_titles)
+        for title in missing_titles:
+            failures.append(f"missing citation title {title!r}")
+        for title in unexpected_titles:
+            failures.append(f"unexpected citation title {title!r}")
+        expected_citation_count = case.get("expectedCitationCount")
+        if expected_citation_count is not None and len(citations) != expected_citation_count:
+            failures.append(
+                f"expected {expected_citation_count} citations, received {len(citations)}"
+            )
+        if response.get("isNoAnswer") and citations:
+            failures.append("no-answer response returned citations")
         answer = (response.get("answer") or "").lower()
         for term in case.get("expectedAnswerTerms", []):
             if term.lower() not in answer:
@@ -201,11 +213,17 @@ def main() -> int:
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
 
+    health_status, health_response, _ = request_json("GET", f"{base_url}/health/ready")
+    dependencies = health_response.get("dependencies", {}) if health_status == 200 else {}
+    uses_external_document_worker = "document-worker" in dependencies
+    evaluation_tenant = (
+        f"evaluation-{uuid4().hex}" if uses_external_document_worker else "demo-tenant"
+    )
     token_status, token_response, _ = request_json(
         "POST",
         f"{base_url}/api/v1/auth/development-token",
         {
-            "tenantId": "demo-tenant",
+            "tenantId": evaluation_tenant,
             "userId": "evaluation-user",
             "permissions": ["knowledge.read", "documents.write", "tickets.write", "approvals.approve"],
             "accessTags": ["employee"],

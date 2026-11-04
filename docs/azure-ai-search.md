@@ -12,11 +12,14 @@ AzureAiSearch__Endpoint=https://YOUR-SERVICE.search.windows.net
 AzureAiSearch__IndexName=idx-eaokit-chunks-v1
 AzureAiSearch__SemanticConfiguration=sem-eaokit-grounding-v1
 AzureAiSearch__VectorField=contentVector
+AzureAiSearch__MinimumGroundingScore=0.5
 AzureAiSearch__CredentialMode=ManagedIdentity
 AzureAiSearch__ManagedIdentityClientId=
 ```
 
 `ManagedIdentity` uses the system-assigned identity when the client ID is empty. `DefaultAzureCredential` is intended for local Azure CLI/IDE authentication. A query API key can be supplied through `AzureAiSearch__ApiKey`, but managed identity is the recommended deployment mode and no key belongs in source control.
+
+`MinimumGroundingScore` is applied after semantic reranker scores are normalized from Azure's 0–4 range to 0–1. The default rejected weak false-positive matches in the synthetic live smoke test, but it must be tuned with a representative, tenant-safe evaluation set before production use. Readiness checks the index document count through the data plane, so both a query key and `Search Index Data Reader` identity can satisfy the probe.
 
 For a local key-based smoke test, keep the query key outside committed settings:
 
@@ -68,4 +71,4 @@ The `deploy/azure/search` directory contains stable REST `2026-04-01` JSON bodie
 
 ## Current boundary
 
-The query adapter, deterministic HTTP contract test, and structurally validated JSON templates are implemented. The Blob upload/source adapter, managed-identity deployment profile, and live Azure validation remain Phase 5 work. Azure AI Search deletion policies don't apply to the one-to-many projection used here, so explicit projected-chunk deletion remains an application responsibility. No Azure benchmark or live-cloud validation is claimed yet.
+The query adapter, Blob upload/source adapter, managed-identity deployment profile, deterministic HTTP contract tests, and structurally validated JSON templates are implemented. The synthetic development index has been smoke-tested with hybrid semantic retrieval and query-key readiness. This is connectivity and behavior validation, not a quality or performance benchmark. Azure AI Search deletion policies don't apply to the one-to-many projection used here, so explicit projected-chunk deletion remains an application responsibility.

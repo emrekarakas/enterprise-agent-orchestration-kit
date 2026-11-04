@@ -268,6 +268,7 @@ Known limits of the current phase:
 - Prompt-injection detection is heuristic and cannot prove content safe.
 - PostgreSQL tenant filtering is enforced in repository queries, not database row-level security yet.
 - Local retrieval currently uses deterministic vector search. Azure AI Search supports native hybrid and semantic retrieval; application-side local hybrid fusion remains future work.
+- Retrieval grounding thresholds are configurable and provider-specific. A fail-closed lexical evidence-overlap gate also rejects vector matches with no meaningful query/evidence term in common. The included defaults reduce weak matches on the synthetic dataset, but they are not a universal relevance guarantee; tune and re-evaluate them for each corpus and language.
 - The included ticket connector is deliberately synthetic. Real connectors still require connector-side authorization, idempotency, and reconciliation.
 - Approval expiry is enforced when records are accessed; scheduled cleanup is not implemented yet.
 - Upload validation checks names, extensions, MIME, basic signatures, size, tenant, and access tags. It does not replace malware scanning or content-disarm/reconstruction.
@@ -294,7 +295,7 @@ docker compose down --volumes
 
 Most tests use deterministic in-process adapters and require no paid model. The opt-in Testcontainers suite applies all migrations to a clean PostgreSQL 17 instance, verifies tenant-scoped persistence, and proves Redis idempotency is atomic and tenant-prefixed. The full-stack gate exercises upload, Qdrant ingestion, grounded answer, cross-tenant isolation, approval, and replay protection over real HTTP.
 
-The versioned evaluation smoke dataset covers routing, tool selection, groundedness, citation correctness, no-answer behavior, prompt-injection resistance, latency, token proxies, and fake-provider cost. Against the Qdrant-backed stack it uploads its own synthetic seed documents first. Start the deterministic API and run `python3 evaluations/run.py`; CI applies the thresholds in `evaluations/thresholds.json`. A protected, manually dispatched workflow exercises real providers and reports uncollected cost as `null`, never as zero. No unmeasured benchmark claim is made.
+The 30-case versioned evaluation smoke dataset covers routing, tool selection, groundedness, exact citation sets, no-answer behavior, prompt-injection resistance, latency, token proxies, and fake-provider cost. No-answer cases must return no citations. Against the Qdrant-backed stack it uploads its own synthetic seed documents first. Start the deterministic API and run `python3 evaluations/run.py`; CI applies the thresholds in `evaluations/thresholds.json`. A protected, manually dispatched workflow exercises real providers and reports uncollected cost as `null`, never as zero. No unmeasured benchmark claim is made.
 
 ## Azure deployment approach
 

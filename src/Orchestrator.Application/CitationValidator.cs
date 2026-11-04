@@ -6,12 +6,22 @@ public static class CitationValidator
 {
     public static AgentAnswer Validate(AgentAnswer answer, IReadOnlyList<SearchHit> evidence)
     {
+        if (answer.IsNoAnswer)
+        {
+            return answer with { Citations = [], IsGrounded = false };
+        }
+
         var allowed = evidence
             .GroupBy(hit => (hit.DocumentId, hit.ChunkId))
             .ToDictionary(group => group.Key, group => group.First());
         var validated = answer.Citations
             .Where(citation => allowed.TryGetValue((citation.DocumentId, citation.ChunkId), out var hit)
-                && hit.Content.Contains(citation.Quote, StringComparison.OrdinalIgnoreCase))
+                && string.Equals(hit.Title, citation.Title, StringComparison.Ordinal)
+                && string.Equals(hit.SourceUri, citation.SourceUri, StringComparison.Ordinal)
+                && string.Equals(hit.Locator, citation.Locator, StringComparison.Ordinal)
+                && hit.Content.Contains(citation.Quote, StringComparison.OrdinalIgnoreCase)
+                && answer.Text.Contains(citation.CitationId, StringComparison.Ordinal))
+            .DistinctBy(citation => citation.CitationId, StringComparer.Ordinal)
             .ToArray();
 
         var hasInvalidCitation = validated.Length != answer.Citations.Count;
@@ -24,6 +34,6 @@ public static class CitationValidator
                 true);
         }
 
-        return answer with { Citations = validated, IsGrounded = answer.IsNoAnswer || validated.Length > 0 };
+        return answer with { Citations = validated, IsGrounded = validated.Length > 0, IsNoAnswer = false };
     }
 }

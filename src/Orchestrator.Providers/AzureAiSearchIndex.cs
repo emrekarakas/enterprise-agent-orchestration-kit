@@ -19,6 +19,7 @@ public sealed class AzureAiSearchOptions
     public string ApiVersion { get; set; } = "2026-04-01";
     public string SemanticConfiguration { get; set; } = "sem-eaokit-grounding-v1";
     public string VectorField { get; set; } = "contentVector";
+    public double MinimumGroundingScore { get; set; } = 0.5;
     public string CredentialMode { get; set; } = "DefaultAzureCredential";
     public string? ManagedIdentityClientId { get; set; }
     public string? ApiKey { get; set; }
@@ -109,7 +110,7 @@ public sealed class AzureAiSearchIndex : ISearchIndex
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return ParseHits(document.RootElement, request);
+            return ParseHits(document.RootElement, request, Math.Max(request.MinimumScore, _options.MinimumGroundingScore));
         }
         catch (DomainException)
         {
@@ -127,7 +128,9 @@ public sealed class AzureAiSearchIndex : ISearchIndex
 
     public async Task CheckHealthAsync(CancellationToken cancellationToken)
     {
-        var endpoint = $"indexes/{Uri.EscapeDataString(_options.IndexName)}?api-version={Uri.EscapeDataString(_options.ApiVersion)}";
+        // Query keys can read documents but cannot read index metadata. Readiness must
+        // exercise the same data-plane permission used by SearchAsync.
+        var endpoint = $"indexes/{Uri.EscapeDataString(_options.IndexName)}/docs/$count?api-version={Uri.EscapeDataString(_options.ApiVersion)}";
         using var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
         await AuthenticateAsync(message, cancellationToken).ConfigureAwait(false);
         using var response = await _httpClient.SendAsync(message, cancellationToken).ConfigureAwait(false);
@@ -152,7 +155,7 @@ public sealed class AzureAiSearchIndex : ISearchIndex
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
     }
 
-    private static SearchHit[] ParseHits(JsonElement root, SearchRequest request)
+    private static SearchHit[] ParseHits(JsonElement root, SearchRequest request, double minimumScore)
     {
         if (!root.TryGetProperty("value", out var values) || values.ValueKind != JsonValueKind.Array)
         {
@@ -180,7 +183,7 @@ public sealed class AzureAiSearchIndex : ISearchIndex
                 && reranker.ValueKind == JsonValueKind.Number
                 ? Math.Clamp(reranker.GetDouble() / 4d, 0d, 1d)
                 : item.GetProperty("@search.score").GetDouble();
-            if (rawScore < request.MinimumScore)
+            if (rawScore < minimumScore)
             {
                 continue;
             }
@@ -236,6 +239,11 @@ public sealed class AzureAiSearchIndex : ISearchIndex
             || string.IsNullOrWhiteSpace(options.VectorField))
         {
             throw new InvalidOperationException("Azure AI Search index, semantic configuration, and vector field are required.");
+        }
+
+        if (options.MinimumGroundingScore is < 0 or > 1)
+        {
+            throw new InvalidOperationException("AzureAiSearch:MinimumGroundingScore must be between 0 and 1.");
         }
 
         if (string.IsNullOrWhiteSpace(options.ApiKey) && credential is null)

@@ -35,6 +35,8 @@ jobs:
       - if: matrix.language == 'csharp'
         run: dotnet build EnterpriseAgentOrchestrationKit.slnx --configuration Release
       - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
 
   secrets:
     runs-on: ubuntu-latest

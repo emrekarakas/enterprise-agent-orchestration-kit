@@ -63,7 +63,7 @@ public sealed class InMemoryEnterpriseSearch : ISearchIndex
             "Synthetic Information Security Policy",
             "demo://policies/security",
             "Incident reporting",
-            "Suspected security incidents must be reported to the support desk within one hour of discovery.",
+            "Suspected security incidents must be reported to the support desk within one hour of discovery. Employees must not investigate suspected incidents on their own.",
             0,
             tenant,
             accessTags.ToArray());

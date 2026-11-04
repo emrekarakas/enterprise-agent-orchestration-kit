@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Orchestrator.Application;
 using Orchestrator.Domain;
 using Orchestrator.Providers;
@@ -30,6 +31,60 @@ public sealed class ToolAndCitationTests
 
         Assert.NotEmpty(result);
         Assert.DoesNotContain(result, hit => hit.TenantId == TenantId.Create("other-tenant"));
+    }
+
+    [Fact]
+    public async Task SearchToolUsesConfiguredGroundingThreshold()
+    {
+        var search = new CapturingSearchIndex();
+        var tool = new EnterpriseSearchTool(search, Options.Create(new RetrievalOptions
+        {
+            MinimumGroundingScore = 0.63
+        }));
+
+        var result = await tool.ExecuteAsync(
+            new ToolExecutionContext(CreatePreparedRequest(new HashSet<string> { "enterprise-search" }), "invocation", null),
+            JsonSerializer.SerializeToElement(new { query = "travel policy" }),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(search.Request);
+        Assert.Equal(0.63, search.Request.MinimumScore, 5);
+    }
+
+    [Fact]
+    public async Task SearchToolRejectsVectorHitWithoutLexicalEvidenceSupport()
+    {
+        var unrelatedHit = new SearchHit(
+            "document-1", "chunk-1", "Travel Policy", "demo://travel", "Section 1",
+            "International travel expenses are limited to 85 units.", 0.9,
+            TenantId.Create("demo-tenant"), []);
+        var tool = new EnterpriseSearchTool(new FixedSearchIndex([unrelatedHit]));
+
+        var result = await tool.ExecuteAsync(
+            new ToolExecutionContext(CreatePreparedRequest(new HashSet<string> { "enterprise-search" }), "invocation", null),
+            JsonSerializer.SerializeToElement(new { query = "How many moons orbit fictional Zephyria?" }),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(result.Output.GetProperty("hits").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task SearchToolRejectsHitThatSharesOnlyOneOfSeveralMeaningfulTerms()
+    {
+        var weakHit = new SearchHit(
+            "document-1", "chunk-1", "Information Security Policy", "demo://security", "Section 1",
+            "Security incidents must be reported.", 0.9,
+            TenantId.Create("demo-tenant"), []);
+        var tool = new EnterpriseSearchTool(new FixedSearchIndex([weakHit]));
+
+        var result = await tool.ExecuteAsync(
+            new ToolExecutionContext(CreatePreparedRequest(new HashSet<string> { "enterprise-search" }), "invocation", null),
+            JsonSerializer.SerializeToElement(new { query = "Summarize the travel policy." }),
+            CancellationToken.None);
+
+        Assert.Empty(result.Output.GetProperty("hits").EnumerateArray());
     }
 
     [Fact]
@@ -86,6 +141,41 @@ public sealed class ToolAndCitationTests
     }
 
     [Fact]
+    public void CitationValidatorRejectsCitationThatIsNotReferencedByAnswerText()
+    {
+        var hit = new SearchHit(
+            "document-1", "chunk-1", "Title", "demo://first", "Section 1",
+            "Verified evidence.", 1, TenantId.Create("demo-tenant"), []);
+        var answer = new AgentAnswer(
+            "An answer without a citation marker.",
+            [new Citation("[1]", "document-1", "chunk-1", "Title", "demo://first", "Section 1", "Verified evidence.")],
+            true,
+            false);
+
+        var validated = CitationValidator.Validate(answer, [hit]);
+
+        Assert.True(validated.IsNoAnswer);
+        Assert.False(validated.IsGrounded);
+        Assert.Empty(validated.Citations);
+    }
+
+    [Fact]
+    public void CitationValidatorForcesNoAnswerToBeUngroundedAndCitationFree()
+    {
+        var answer = new AgentAnswer(
+            "There is not enough evidence.",
+            [new Citation("[1]", "document-1", "chunk-1", "Title", "demo://first", null, "Evidence")],
+            true,
+            true);
+
+        var validated = CitationValidator.Validate(answer, []);
+
+        Assert.True(validated.IsNoAnswer);
+        Assert.False(validated.IsGrounded);
+        Assert.Empty(validated.Citations);
+    }
+
+    [Fact]
     public async Task ToolDispatcherRejectsToolOutsidePreparedAllowList()
     {
         var tool = new EnterpriseSearchTool(new InMemoryEnterpriseSearch());
@@ -119,5 +209,25 @@ public sealed class ToolAndCitationTests
             new IntentDecision(IntentCategory.Knowledge, 1, "test"),
             InputRisk.None,
             new PolicyDecision(true, "test", allowedTools));
+    }
+
+    private sealed class CapturingSearchIndex : ISearchIndex
+    {
+        public SearchRequest? Request { get; private set; }
+
+        public Task<IReadOnlyList<SearchHit>> SearchAsync(
+            SearchRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult<IReadOnlyList<SearchHit>>([]);
+        }
+    }
+
+    private sealed class FixedSearchIndex(IReadOnlyList<SearchHit> hits) : ISearchIndex
+    {
+        public Task<IReadOnlyList<SearchHit>> SearchAsync(
+            SearchRequest request,
+            CancellationToken cancellationToken) => Task.FromResult(hits);
     }
 }

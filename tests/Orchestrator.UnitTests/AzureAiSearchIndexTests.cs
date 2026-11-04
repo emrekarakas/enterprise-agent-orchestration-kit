@@ -66,7 +66,7 @@ public sealed class AzureAiSearchIndexTests
             "international travel limit",
             new HashSet<string> { "employee" },
             5,
-            0.5), CancellationToken.None);
+            0.2), CancellationToken.None);
 
         var hit = Assert.Single(hits);
         Assert.Equal("doc-1", hit.DocumentId);
@@ -85,6 +85,25 @@ public sealed class AzureAiSearchIndexTests
         Assert.Contains("search.in", filter, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ReadinessUsesQueryKeyCompatibleDocumentCountEndpoint()
+    {
+        var handler = new RecordingHandler("3");
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://search.example.invalid/") };
+        var adapter = new AzureAiSearchIndex(client, Options.Create(new AzureAiSearchOptions
+        {
+            Endpoint = "https://search.example.invalid",
+            IndexName = "enterprise-agent-chunks",
+            ApiKey = "query-key"
+        }));
+
+        await adapter.CheckHealthAsync(CancellationToken.None);
+
+        Assert.Equal(HttpMethod.Get, handler.Request!.Method);
+        Assert.Contains("indexes/enterprise-agent-chunks/docs/$count", handler.Request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
+        Assert.Equal("query-key", handler.Request.Headers.GetValues("api-key").Single());
+    }
+
     private sealed class RecordingHandler : HttpMessageHandler
     {
         private readonly string _response;
@@ -99,7 +118,9 @@ public sealed class AzureAiSearchIndexTests
             CancellationToken cancellationToken)
         {
             Request = request;
-            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Body = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(_response, Encoding.UTF8, "application/json")

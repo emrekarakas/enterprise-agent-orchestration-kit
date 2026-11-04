@@ -8,6 +8,7 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 worker && useradd --system --uid 10001 --gid worker worker
 COPY pyproject.toml ./
 COPY app ./app
+RUN pip install --no-cache-dir --upgrade "pip==26.0.1" "setuptools==82.0.1"
 RUN pip install --no-cache-dir .
 RUN mkdir -p /data && chown -R worker:worker /app /data
 USER worker

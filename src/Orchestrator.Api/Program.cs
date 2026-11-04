@@ -142,6 +142,7 @@ if (blobOptions.Enabled)
 }
 
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.Configure<RetrievalOptions>(builder.Configuration.GetSection(RetrievalOptions.SectionName));
 builder.Services.AddSingleton<DeterministicFakeAiProvider>();
 builder.Services.AddSingleton<IRerankingProvider>(services => services.GetRequiredService<DeterministicFakeAiProvider>());
 builder.Services.AddSingleton<ISafetyProvider>(services => services.GetRequiredService<DeterministicFakeAiProvider>());

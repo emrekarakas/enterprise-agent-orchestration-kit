@@ -1,14 +1,44 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Options;
 using Orchestrator.Application;
 
 namespace Orchestrator.Providers;
 
+public sealed class RetrievalOptions
+{
+    public const string SectionName = "Retrieval";
+
+    public double MinimumGroundingScore { get; set; } = 0.2;
+    public bool RequireLexicalEvidenceOverlap { get; set; } = true;
+}
+
 public sealed class EnterpriseSearchTool : IAgentTool
 {
-    private const double MinimumGroundingScore = 0.2;
+    private static readonly Regex WordPattern = new(@"[\p{L}\p{N}]+", RegexOptions.Compiled);
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "an", "and", "are", "as", "at", "be", "both", "by", "do", "does", "for", "from",
+        "how", "in", "is", "it", "must", "of", "on", "or", "should", "the", "this", "to", "what",
+        "when", "where", "who", "why", "will", "with", "describe", "compare", "state", "summarize"
+    };
     private readonly ISearchIndex _search;
+    private readonly RetrievalOptions _options;
 
-    public EnterpriseSearchTool(ISearchIndex search) => _search = search;
+    public EnterpriseSearchTool(ISearchIndex search, IOptions<RetrievalOptions> options)
+    {
+        _search = search;
+        _options = options.Value;
+        if (_options.MinimumGroundingScore is < 0 or > 1)
+        {
+            throw new InvalidOperationException("Retrieval:MinimumGroundingScore must be between 0 and 1.");
+        }
+    }
+
+    public EnterpriseSearchTool(ISearchIndex search)
+        : this(search, Options.Create(new RetrievalOptions()))
+    {
+    }
 
     public ToolDescriptor Descriptor { get; } = new(
         "enterprise-search",
@@ -50,17 +80,39 @@ public sealed class EnterpriseSearchTool : IAgentTool
         var top = arguments.TryGetProperty("top", out var topElement) ? topElement.GetInt32() : 5;
         var minimumScore = arguments.TryGetProperty("minimumScore", out var scoreElement)
             ? scoreElement.GetDouble()
-            : MinimumGroundingScore;
+            : _options.MinimumGroundingScore;
+        var query = queryElement.GetString()!;
         var hits = await _search.SearchAsync(new SearchRequest(
             context.Request.Original.User.TenantId,
-            queryElement.GetString()!,
+            query,
             context.Request.Original.User.AccessTags,
             top,
             minimumScore), cancellationToken).ConfigureAwait(false);
+        if (_options.RequireLexicalEvidenceOverlap)
+        {
+            hits = hits.Where(hit => HasLexicalSupport(query, $"{hit.Title} {hit.Content}")).ToArray();
+        }
 
         return new ToolResult(true, JsonSerializer.SerializeToElement(new { hits }), null, false);
     }
 
     public bool ValidateResult(ToolResult result) =>
         result.Output.ValueKind == JsonValueKind.Object && result.Output.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array;
+
+    private static bool HasLexicalSupport(string query, string evidence)
+    {
+        var queryTerms = Tokenize(query);
+        if (queryTerms.Count == 0)
+        {
+            return false;
+        }
+
+        var requiredMatches = Math.Min(2, queryTerms.Count);
+        return Tokenize(evidence).Intersect(queryTerms).Take(requiredMatches).Count() == requiredMatches;
+    }
+
+    private static HashSet<string> Tokenize(string text) => WordPattern.Matches(text)
+        .Select(match => match.Value.ToLowerInvariant())
+        .Where(token => token.Length >= 3 && !StopWords.Contains(token))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 }
