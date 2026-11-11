@@ -4,7 +4,7 @@ COPY . .
 RUN dotnet restore EnterpriseAgentOrchestrationKit.slnx
 RUN dotnet publish src/Orchestrator.Api/Orchestrator.Api.csproj -c Release --no-restore -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 RUN apt-get update \
     && apt-get install --no-install-recommends -y curl \
     && rm -rf /var/lib/apt/lists/*
